@@ -1,0 +1,47 @@
+DROP VIEW IF EXISTS summarytable;
+
+CREATE VIEW summarytable AS
+	SELECT
+		o.orderid,
+		o.orderdate,
+		o.customerid,
+		o.totalamount,
+		ol.quantity AS order_quantity,
+		ca.category_name,
+		p.title,
+		c.city,
+		c.state,
+		c.country,
+		c.age,
+		c.income,
+		c.gender,
+
+		/* customer type {'new': 'first order','existing':'>=1'} */
+		(SELECT CASE WHEN (SELECT count(*) FROM orders o_tmp_1 LEFT JOIN customers c_tmp_1 on c_tmp_1.customerid = o_tmp_1.customerid
+			WHERE c_tmp_1.customerid = c.customerid and o_tmp_1.orderdate < o.orderdate) = 0 THEN 'new' ELSE 'existing'
+		END AS customertype) as customer_type
+
+		FROM orders o LEFT JOIN customers c on c.customerid = o.customerid inner join orderlines ol on ol.orderid = o.orderid inner join products p on p.prod_id = ol.prod_id
+		inner join categories ca on ca.category = p.category
+
+		ORDER BY o.orderdate ASC;
+
+/* For my confusion about the last 2 columns */
+DROP table IF EXISTS no_of_prev_orders_tab;
+CREATE TABLE no_of_prev_orders_tab AS
+SELECT  distinct a.customerid,
+  1 as previous_order_number,
+  st_tmp1.totalamount as total_amount_of_previous_order
+FROM summarytable st_tmp1
+WHERE  st_tmp1.customer_type = 'new'
+ORDER BY st_tmp1.customerid;
+
+DROP TABLE IF EXISTS total_dollar_amount_of_previous_orders_tab;
+CREATE TABLE total_dollar_amount_of_previous_orders_tab AS
+SELECT  st_tmp2.customerid,
+  COUNT(st_tmp2.orderid) as previous_order_number,
+  SUM(st_tmp2.totalamount) as total_amount_of_previous_order
+FROM summarytable st_tmp2
+WHERE st_tmp2.customer_type = 'existing'
+GROUP BY st_tmp2.customerid
+ORDER BY st_tmp2.customerid;
